@@ -71,7 +71,10 @@ def column_statistic_by_table(args):
 
 def column_statistic_all(dataset, sample_cnt):
     data_path = get_csv_folder(dataset)
-    save_path = f'embedding/statistic/{dataset}_statistic.pickle'
+    save_path_root = 'embeddings/statistic'
+    save_path = os.path.join(save_path_root, f'{dataset}_statistic.pickle')
+    if not os.path.exists(save_path_root):
+        os.makedirs(save_path_root)
     tableDict = {}
     en_words = set(words.words())
     for fn in tqdm.tqdm(os.listdir(data_path)):
@@ -81,11 +84,11 @@ def column_statistic_all(dataset, sample_cnt):
     pickle.dump(tableDict, open(save_path, 'wb'))
 
 if __name__ == '__main__':
-    # for n1 in ['TUS_', 'SANTOS_']:
-    #     for n2 in ['small', 'large']:
-    #         dataset = n1 + n2
-    #         number_encoder_all(dataset, dim = 128)
-
-    dataset = 'test'
     sample_cnt = 200
-    column_statistic_all(dataset, sample_cnt)
+    for n1 in ['TUS_', 'SANTOS_']:
+        for n2 in ['small', 'large']:
+            dataset = n1 + n2
+            column_statistic_all(dataset, sample_cnt)
+
+    # dataset = 'test'
+    # column_statistic_all(dataset, sample_cnt)
