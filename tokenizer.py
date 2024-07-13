@@ -7,7 +7,8 @@ from parallel import solve
 from global_info import get_csv_folder
 from filter import filter
 
-def getWordsCount(counts):
+def getWordsCount(col):
+    counts = col.value_counts().to_dict()
     string_counts = defaultdict(int)
     number_counts = defaultdict(int)
     for k, v in counts.items():
@@ -25,8 +26,7 @@ def tokenize_column_by_table(args):
     string_topK = {}
     number_topK = {}
     for column_name in data.columns:
-        counts = data[column_name].value_counts().to_dict()
-        string_counts, number_counts = getWordsCount(counts)
+        string_counts, number_counts = getWordsCount(data[column_name])
         string_topK[column_name] = set(string_counts[:string_k])
         number_topK[column_name] = set(number_counts[:number_k])
     return (string_topK, number_topK)
