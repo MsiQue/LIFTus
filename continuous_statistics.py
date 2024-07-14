@@ -1,28 +1,28 @@
 def numberRatio(col):
     # int + float
     if len(col) == 0:
-        return 0.0
+        return [0.0]
     from utils import is_int, is_float
     int_count = col.apply(lambda x: (is_int(x) or is_float(x))).sum()
     return [int_count / len(col)]
 
 def floatRatio(col):
     if len(col) == 0:
-        return 0.0
+        return [0.0]
     from utils import is_float
     int_count = col.apply(lambda x: is_float(x)).sum()
     return [int_count / len(col)]
 
 def intRatio(col):
     if len(col) == 0:
-        return 0.0
+        return [0.0]
     from utils import is_int
     int_count = col.apply(lambda x: is_int(x)).sum()
     return [int_count / len(col)]
 
 def stringRatio(col):
     if len(col) == 0:
-        return 0.0
+        return [0.0]
     from utils import is_pure_alphabet_space
     int_count = col.apply(lambda x: is_pure_alphabet_space(x)).sum()
     return [int_count / len(col)]
@@ -49,7 +49,7 @@ def average_variance_Length(col):
 
 def spaceRatio(col):
     if len(col) == 0:
-        return 0.0
+        return [0.0]
     col_str = col.astype(str)
     return [col_str.str.contains(' ').sum() / len(col_str)]
 
