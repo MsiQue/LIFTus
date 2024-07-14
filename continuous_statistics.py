@@ -29,13 +29,13 @@ def stringRatio(col):
 
 # def averageLength(col):
 #     if len(col) == 0:
-#         return 0.0
+#         return [0.0]
 #     str_lengths = col.astype(str).apply(len)
 #     return [str_lengths.mean()]
 #
 # def varianceLength(col):
 #     if len(col) <= 1:
-#         return 0.0
+#         return [0.0]
 #     str_lengths = col.astype(str).apply(len)
 #     return [str_lengths.var()]
 
