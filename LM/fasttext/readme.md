@@ -1,0 +1,1 @@
+Please download file 'wiki-news-300d-1M.vec' and move it to the current folder.
