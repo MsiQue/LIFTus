@@ -32,7 +32,7 @@ def run_step(dataset, trainData, testData, input_size, device, num_heads, hidden
         if os.path.exists(model_save_path):
             return
         print(f'Create {model_save_path}')
-    model = Net(input_size_left=input_size[0], input_size_right=input_size[1], num_heads=num_heads, hidden_size=hiddensize, criterion=nn.CrossEntropyLoss().to(device))
+    model = Net(input_size_left=input_size[0], input_size_right=input_size[1], num_heads=num_heads, hidden_size=hiddensize, criterion=nn.CrossEntropyLoss().to(device), device=device)
     model = model.to(device)
     optimizer = AdamW(model.parameters(), lr=lr)
     train(F, model, trainData, optimizer, batchsize, n_epochs)
@@ -41,11 +41,12 @@ def run_step(dataset, trainData, testData, input_size, device, num_heads, hidden
     dict_k = {'TUS_small': 60, 'TUS_large': 60, 'SANTOS_small': 10, 'SANTOS_large': 20}
     return calc(dataset, model, testData, dict_k[dataset], 'HNSW64')
 
-def run(dataset, left_list, right_list, input_size, message, num_heads_list, hiddensize_list, lr_list, batchsize):
+def run(dataset, left_list, right_list, input_size, num_heads_list, hiddensize_list, lr_list, batchsize):
+    message = '-'.join(leftList) + '==' + '-'.join(rightList)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     t1 = time.time()
-    trainData = getTrainData(dataset + '_split_2', fill_template_list(left_list, dataset + '_split_2'), fill_template_list(right_list, dataset + '_split_2'), device)
-    testData = getTestData(dataset, fill_template_list(left_list, dataset), fill_template_list(right_list, dataset), device)
+    trainData = getTrainData(dataset + '_split_2', fill_template_list(left_list, dataset + '_split_2'), fill_template_list(right_list, dataset + '_split_2'))
+    testData = getTestData(dataset, fill_template_list(left_list, dataset), fill_template_list(right_list, dataset))
     print(f'Load dataset {dataset} cost {time.time() - t1} s')
 
     result = []
@@ -57,35 +58,41 @@ def run(dataset, left_list, right_list, input_size, message, num_heads_list, hid
                 print(dataset, num_heads, hiddensize, lr)
                 res = run_step(dataset, trainData, testData, input_size, device, num_heads, hiddensize, lr, batchsize, None)
                 print(res)
-                result.append((dataset, num_heads, hiddensize, lr, res))
+                result.append((dataset, message, num_heads, hiddensize, lr, res))
     return result
 
+def emb_path(L):
+    emb_path_dict = {
+        'statistic' : ['embeddings/statistic/{}_statistic.pickle'],
+        'paragraph' : ['embeddings/paragraph/{}_sample_128_paragraph__bert.pickle', 128, 768],
+        'word' : ['embeddings/word/{}_word_emb_64_sample.pickle', 64, 300],
+        'number': ['embeddings/number/{}_number_emb_128_dim.pickle', 14, 128],
+        'pattern': ['embeddings/pattern/{}_sample_128_pattern.pickle', 128, 128]
+    }
+    return [emb_path_dict[x] for x in L]
+
+def dims(L, num_heads = 8):
+    dim_dict = {
+        'statistic' : 99,
+        'paragraph' : [768, num_heads],
+        'word' : [300, num_heads],
+        'number' : [128, num_heads],
+        'pattern' : [128, num_heads]
+    }
+    return [dim_dict[x] for x in L]
+
 if __name__ == '__main__':
+    leftList = ['statistic']
+    # rightList = ['paragraph', 'word', 'number', 'pattern']
+    rightList = ['paragraph', 'word', 'number']
+
+    run('test', emb_path(leftList), emb_path(rightList), [dims(leftList), dims(rightList)], [2], [128],[0.0005], 64)
+
     result = []
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
             dataset = n1 + n2
-            dataset_split_2 = n1 + n2 + '_split_2'
-
-            # message = "word_feature"
-            # message = "word"
-            # message = "feature=aveword_feature_pattern"
-            message = "feature=fasttextword_feature_pattern"
-
-            emb_path_dict = {
-                "feature=aveword_feature_pattern": (
-                    ['/data/qiuermu/test_74/vectors/featureEmb/{}_featureEmb.pickle'],
-                    ['/data/qiuermu/test_74/vectors/wordEmb/{}_wordEmb_top_10.pickle', '/data/qiuermu/test_74/vectors/featureEmb/{}_featureEmb.pickle', '/data/qiuermu/test_74/vectors/patternEmb/{}_patternEmb.pickle'],
-                    [[11], [300, 11, 64]]
-                ),
-                "feature=fasttextword_feature_pattern": (
-                    ['/data/qiuermu/test_74/vectors/featureEmb/{}_featureEmb.pickle'],
-                    [['vectors/wordEmb_all/fasttext_{}_wordnijia_split.pickle', 200, 300], '/data/qiuermu/test_74/vectors/featureEmb/{}_featureEmb.pickle', '/data/qiuermu/test_74/vectors/patternEmb/{}_patternEmb.pickle'],
-                    [[11], [300, 11, 64]]
-                )
-            }
-            emb_path_tuple = emb_path_dict[message]
-            # result += run(dataset, emb_path_tuple[0], emb_path_tuple[1], emb_path_tuple[2], message, [1, 2, 4, 8], [32, 64, 128, 256], [0.001, 0.0005])
-            result += run(dataset, emb_path_tuple[0], emb_path_tuple[1], emb_path_tuple[2], message, [2], [128], [0.0005], 32)
+            # dataset_split_2 = n1 + n2 + '_split_2'
+            result += run(dataset, emb_path(leftList), emb_path(rightList), [dims(leftList), dims(rightList)], [2], [128], [0.0005], 64)
     for r in result:
         print(r)
