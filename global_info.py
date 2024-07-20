@@ -1,37 +1,15 @@
-import os
+import os.path
 import pickle
 import pickle5
 import tqdm
 import pandas as pd
 
 def get_csv_folder(dataset):
-    if os.name == 'nt':
-        if dataset == 'TUS_small':
-            DATAFOLDER = 'D:\Dataset\LIFTus-dataset\TUS_small\datalake'
-        elif dataset == 'TUS_large':
-            DATAFOLDER = 'D:\Dataset\LIFTus-dataset\TUS_large\datalake'
-        elif dataset == 'SANTOS_small':
-            DATAFOLDER = 'D:\Dataset\LIFTus-dataset\labeled_benchmark\datalake'
-        elif dataset == 'SANTOS_large':
-            DATAFOLDER = 'D:\Dataset\LIFTus-dataset\\real_tables_benchmark\datalake'
-        elif dataset.endswith('_split_2'):
-            DATAFOLDER = f'D:\Dataset\LIFTus-dataset\{dataset.split("_split_2")[0]}'
-        else:
-            DATAFOLDER = ''
+    split_suffix = '_split_2'
+    if dataset.endswith(split_suffix):
+        DATAFOLDER = f'positive_sampling/{dataset.split(split_suffix)[0]}'
     else:
-        if dataset == 'TUS_small':
-            DATAFOLDER = '/data/qiuermu/starmie/data/table-union-search-benchmark/small/benchmark'
-        elif dataset == 'TUS_large':
-            DATAFOLDER = '/data/qiuermu/dataset/TUS_Large/tables'
-        elif dataset == 'SANTOS_small':
-            DATAFOLDER = '/data/qiuermu/santos/benchmark/santos_benchmark/dataLake'
-        elif dataset == 'SANTOS_large':
-            DATAFOLDER = '/data/qiuermu/santos/benchmark/real_tables_benchmark/dataLake'
-        elif dataset.endswith('_split_2'):
-            DATAFOLDER = f'/data/qiuermu/test_74/positive_sampling/{dataset.split("_split_2")[0]}'
-        else:
-            DATAFOLDER = ''
-
+        DATAFOLDER = f'data_lake/{dataset}'
     return DATAFOLDER
 
 def get_ground_truth(dataset):
@@ -65,17 +43,22 @@ def get_base_info(dataset, save_path):
 
     pickle.dump((tableDict, cn2id, id2cn), open(save_path, 'wb'))
 
+def get_base_info_all(base_path):
+    if not os.path.exists(base_path):
+        os.makedirs(base_path)
 
-if __name__ == '__main__':
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
             dataset = n1 + n2
-            save_path = f'base_info/{dataset}_base_info.pickle'
+            save_path = f'{base_path}/{dataset}_base_info.pickle'
             get_base_info(dataset, save_path)
 
     # _split_2
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
             dataset = n1 + n2 + '_split_2'
-            save_path = f'base_info/{dataset}_base_info.pickle'
+            save_path = f'{base_path}/{dataset}_base_info.pickle'
             get_base_info(dataset, save_path)
+
+if __name__ == '__main__':
+    get_base_info_all('base_info')

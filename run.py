@@ -63,7 +63,7 @@ def run(dataset, left_list, right_list, input_size, num_heads_list, hiddensize_l
 
 def emb_path(L):
     emb_path_dict = {
-        'statistic' : ['embeddings/statistic/{}_statistic.pickle'],
+        'statistic' : 'embeddings/statistic/{}_statistic.pickle',
         'paragraph' : ['embeddings/paragraph/{}_sample_128_paragraph__bert.pickle', 128, 768],
         'word' : ['embeddings/word/{}_word_emb_64_sample.pickle', 64, 300],
         'number': ['embeddings/number/{}_number_emb_128_dim.pickle', 14, 128],

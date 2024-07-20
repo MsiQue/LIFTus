@@ -35,7 +35,7 @@ def col_paragraph2vectors(_col, sample_cnt, method, **kwargs):
         s = col.iloc[i]
         if method == 'bert':
             emb = kwargs['convertFunc'](kwargs['tokenizer'], kwargs['model'], kwargs['device'], s)
-        res.append((s, emb))
+        res.append((s, emb.squeeze().detach().cpu().numpy()))
     return res
 
 def get_table_paragraph_info_by_column(args):
@@ -81,7 +81,8 @@ if __name__ == '__main__':
 
     print('finishing loading LM')
 
-    # paragraph_encoder_all('test_split_2', 128, 'bert', is_parallel=False, convertFunc = convertFunc_bert, tokenizer = tokenizer, model = model, device = device)
+    paragraph_encoder_all('test', 128, 'bert', is_parallel=False, convertFunc = convertFunc_bert, tokenizer = tokenizer, model = model, device = device)
+    paragraph_encoder_all('test_split_2', 128, 'bert', is_parallel=False, convertFunc = convertFunc_bert, tokenizer = tokenizer, model = model, device = device)
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
             for n3 in ['', '_split_2']:

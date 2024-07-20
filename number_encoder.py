@@ -39,7 +39,7 @@ def histogram_encoder_by_column(sorted_pairs, dim):
         res[cur_bin] += cnt
     assert sum([x[1] for x in sorted_pairs]) == sum(res)
     assert res[-1] > 0
-    return np.array(res)
+    return np.array(res) / sum(res)
 
 def sgn(x):
     eps = 1e-9
@@ -65,11 +65,12 @@ def f_micro(a, x):
         return -2
     return math.sin(a*x)
 
-def magnitude_encoder_by_value(x, dim):
+def magnitude_encoder_by_value(x, dim, tp):
     res = []
     w = [lambda x: x / dim, lambda x: x + 1, lambda x: x]
+    s = ['f_base', 'f_macro', 'f_micro']
     for i, f in enumerate([f_base, f_macro, f_micro]):
-        res.append(np.array([f(w[i](a), x) for a in range(1, dim + 1)]))
+        res.append((tp + s[i], np.array([f(w[i](a), x) for a in range(1, dim + 1)])))
     return res
 
 def number_encoder_by_column(number_pairs, dim):
@@ -89,9 +90,9 @@ def number_encoder_by_column(number_pairs, dim):
     else:
         normalized_numbers = (sorted_numbers - _min) / _range
         ranking_emb = ranking_encoder_by_column(normalized_numbers, dim)
-    res = [ranking_emb.reshape(1, -1), histogram_encoder_by_column(sorted_pairs, dim).reshape(1, -1)]
-    for x in [_min, _max, _range, _ave]:
-        res += magnitude_encoder_by_value(x, dim)
+    res = [('ranking', ranking_emb), ('histogram', histogram_encoder_by_column(sorted_pairs, dim))]
+    for x, tp in zip([_min, _max, _range, _ave], ['min', 'max', 'range', 'ave']):
+        res += magnitude_encoder_by_value(x, dim, tp)
     return res
 
 def number_encoder_by_table(args):
@@ -119,9 +120,9 @@ def number_encoder_all(dataset, dim, string_k = 64, number_k = 512):
     pickle.dump(tableDict, open(save_path, 'wb'))
 
 if __name__ == '__main__':
-    dataset = 'test' + '_split_2'
-    number_encoder_all(dataset, dim = 128)
-    # for n1 in ['TUS_', 'SANTOS_']:
-    #     for n2 in ['small', 'large']:
-    #         dataset = n1 + n2 + '_split_2'
-    #         number_encoder_all(dataset, dim = 128)
+    number_encoder_all('test', dim = 128)
+    number_encoder_all('test' + '_split_2', dim = 128)
+    for n1 in ['TUS_', 'SANTOS_']:
+        for n2 in ['small', 'large']:
+            dataset = n1 + n2 + '_split_2'
+            number_encoder_all(dataset, dim = 128)
