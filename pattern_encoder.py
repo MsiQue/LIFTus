@@ -1,70 +1,14 @@
+import os
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import pickle
 import random
-from torch.utils.data import DataLoader, Dataset
-
-def padding(batch):
-    col1_pattern_list = [sample['col1_pattern_list'] for sample in batch]
-    col2_pattern_list = [sample['col2_pattern_list'] for sample in batch]
-    col1_pattern_list = torch.nn.utils.rnn.pad_sequence(col1_pattern_list, batch_first=True)
-    col2_pattern_list = torch.nn.utils.rnn.pad_sequence(col2_pattern_list, batch_first=True)
-    return {'col1_pattern_list': col1_pattern_list, 'col2_pattern_list': col2_pattern_list, 'y': torch.tensor([sample['y'] for sample in batch]), 'info': [sample['info'] for sample in batch]}
-
-class SiameseNetwork(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(SiameseNetwork, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
-
-    def inference(self, x):
-        out, _ = self.lstm(x)
-        return out[:, -1, :]
-
-    def forward(self, input1, input2):
-        output1 = self.inference(input1)
-        output2 = self.inference(input2)
-        return output1, output2
-
-def train_siamese_network(siamese_net, dataloader, criterion, optimizer, num_epochs=10):
-    for epoch in range(num_epochs):
-        batch_cnt = 0
-        for batch in dataloader:
-            input1 = batch['col1_pattern_list']
-            input2 = batch['col2_pattern_list']
-            label = batch['y']
-            optimizer.zero_grad()
-            output1, output2 = siamese_net(input1, input2)
-            loss = criterion(output1, output2, label)
-            loss.backward()
-            optimizer.step()
-            batch_cnt += 1
-            print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_cnt, loss))
-
-class ContrastiveLoss(nn.Module):
-    def __init__(self, margin=2.0):
-        super(ContrastiveLoss, self).__init__()
-        self.margin = margin
-
-    def forward(self, output1, output2, label):
-        euclidean_distance = nn.PairwiseDistance()(output1, output2)
-        loss_contrastive = torch.mean((label) * torch.pow(euclidean_distance, 2) + (1 - label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
-        return loss_contrastive
-
-def trainprocess(pos_sample_path, neg_sample_path, nn_model_save_path, hidden_size, learning_rate, num_epochs):
-    pos_sample = pickle.load(open(pos_sample_path, 'rb'))
-    neg_sample = pickle.load(open(neg_sample_path, 'rb'))
-    train_data = pos_sample + neg_sample
-
-    batch_size = 128
-    train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=padding)
-
-    net = SiameseNetwork(input_size=98, hidden_size=hidden_size)
-    criterion = ContrastiveLoss(margin=2.0)
-    optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
-
-    train_siamese_network(net, train_dataloader, criterion, optimizer, num_epochs)
-    torch.save(net.state_dict(), nn_model_save_path)
+from collections import defaultdict
+from global_info import get_base_info
+from loss import info_nce_loss
+from transformers import AdamW
+from trainprocess import train, inference_model
+from torch.utils.data import TensorDataset
 
 def strReplace(s, idxList, newChar):
     for idx in idxList:
@@ -111,38 +55,139 @@ def argument(s):
     else:
         return s
 
-if __name__ == '__main__':
-    cnt = {'TUS_small' : 3102, 'TUS_large' : 9926, 'SANTOS_small' : 1635, 'SANTOS_large' : 46710}
+def adjust_length(tensor, d):
+    current_length = tensor.size(0)
+    if current_length < d:
+        tensor = torch.cat([tensor, torch.zeros((d - current_length, tensor.size(1)), dtype=tensor.dtype)])
+    elif current_length > d:
+        tensor = tensor[:d]
+    return tensor
 
-    # times = 100
-    # # for dataset in ['TUS_small', 'TUS_large', 'SANTOS_small', 'SANTOS_large']:
-    # # for dataset in ['TUS_small', 'TUS_large', 'SANTOS_small']:
-    # for dataset in ['SANTOS_small', 'TUS_large']:
-    #     pos_sample_path = f'pos_neg_sample_pattern/pos_sample_argument_{dataset}_0.1_{cnt[dataset]}_patterns_{times}_times.pth'
-    #     neg_sample_path = f'pos_neg_sample_pattern/neg_sample_argument_{dataset}_0.1_{cnt[dataset] * times}_times.pth'
-    #     for hidden_size in [32, 64, 128, 256]:
-    #         for lr in [0.001, 0.0005]:
-    #             nn_model_save_path = f'nn/pattern_emb/{dataset}/nn_model_{dataset}_pattern_lstm_contrastive_loss_times_{times}_hiddensize_{hidden_size}_learningrate_{str(lr).replace(".", "_")}.pth'
-    #             trainprocess(pos_sample_path, neg_sample_path, nn_model_save_path, hidden_size, lr, num_epochs=5)
+def string_to_onehot_matrix(input_string, padding_len = 32):
+    alphabet = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    # 第一个是空格
+    char_to_index = {char: i for i, char in enumerate(alphabet)}
+    sequence_length = len(input_string)
+    onehot_matrix = torch.zeros((sequence_length, len(alphabet) + 3))
 
+    unknown_char_list = set()
+    for i, char in enumerate(input_string):
+        onehot_matrix[i, 0] = char.isdigit()
+        onehot_matrix[i, 1] = char.isupper()
+        onehot_matrix[i, 2] = char.islower()
+        if char in char_to_index:
+            onehot_matrix[i, 3 + char_to_index[char]] = 1
+        else:
+            unknown_char_list.add(char)
 
+    return adjust_length(onehot_matrix, padding_len), unknown_char_list
 
-    dataset = 'SANTOS_large'
-    times = 10
-    num_epochs = 3
-    pos_sample_path = f'pos_neg_sample_pattern/pos_sample_argument_{dataset}_0.1_{cnt[dataset]}_patterns_{times}_times.pth'
-    neg_sample_path = f'pos_neg_sample_pattern/neg_sample_argument_{dataset}_0.1_{cnt[dataset] * times}_times.pth'
-    # for hidden_size in [32, 64, 128, 256]:
-    for hidden_size in [256]:
-        for lr in [0.0005]:
-            if hidden_size == 32 and lr > 0.006:
+class SiameseNetwork(nn.Module):
+    def __init__(self, input_size, hidden_size, criterion):
+        super(SiameseNetwork, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
+        self.criterion = criterion
+
+    def inference(self, x):
+        out, _ = self.lstm(x)
+        return out[:, -1, :]
+
+    def forward(self, input1, input2):
+        output1 = self.inference(input1)
+        output2 = self.inference(input2)
+        z = torch.cat([output1, output2], dim=0)
+        logits, labels = info_nce_loss(z, len(z) // 2, 2)
+        loss = self.criterion(logits, labels)
+        return loss
+
+def getData(dataset, func_list, cn2id, device, n_sample = 10, n_check = 10):
+    save_path_root = 'step_result/pattern'
+    save_path = os.path.join(save_path_root, f'{dataset}_pattern_{n_sample}_{n_check}.pickle')
+    pattern_dict = pickle.load(open(save_path, 'rb'))
+    pattern_vec_list = [[] for _ in range(len(func_list))]
+    cn_id_list = []
+    pattern_id_list = []
+    for table_name, table in pattern_dict.items():
+        for column_name, column_patterns in table.items():
+            if (table_name, column_name) not in cn2id:
+                print(table_name, column_name)
                 continue
-            nn_model_save_path = f'nn/pattern_emb/{dataset}/nn_model_{dataset}_pattern_lstm_contrastive_loss_times_{times}_hiddensize_{hidden_size}_learningrate_{str(lr).replace(".", "_")}.pth'
-            trainprocess(pos_sample_path, neg_sample_path, nn_model_save_path, hidden_size, lr, num_epochs)
+            for i, pattern in enumerate(column_patterns):
+                cn_id_list.append(cn2id[(table_name, column_name)])
+                pattern_id_list.append(i)
+                for i, func in enumerate(func_list):
+                    pattern_vec_list[i].append(string_to_onehot_matrix(func(pattern))[0])
+    return torch.tensor(cn_id_list).to(device), torch.tensor(pattern_id_list).to(device), [torch.stack(x, dim=0).to(device) for x in pattern_vec_list]
 
-    # cnn = CNN()
-    # siamese_net = SiameseNetwork(cnn)
-    # criterion = ContrastiveLoss()
-    # optimizer = optim.Adam(siamese_net.parameters(), lr=0.001)
-    #
-    # train_siamese_network(siamese_net, train_dataloader, criterion, optimizer, num_epochs=5)
+def F(model, batch):
+    batch_ori, batch_arg = batch
+    return model(batch_ori, batch_arg)
+
+def train_pattern_encoder(dataset, trainData, hidden_size, lr, batchsize, device, n_epochs = 10):
+    model_save_path_root = 'step_result/pattern_model'
+    if not os.path.exists(model_save_path_root):
+        os.makedirs(model_save_path_root)
+    model_save_path = os.path.join(model_save_path_root, f'{dataset}_pattern_model_{hidden_size}_learningrate_{str(lr).replace(".", "_")}.pth')
+
+    model = SiameseNetwork(input_size=98, hidden_size=hidden_size, criterion=nn.CrossEntropyLoss().to(device))
+    model = model.to(device)
+
+    if os.path.exists(model_save_path):
+        model.load_state_dict(torch.load(model_save_path))
+        return model
+
+    optimizer = AdamW(model.parameters(), lr=lr)
+    train(F, model, trainData, optimizer, batchsize, n_epochs)
+
+    torch.save(model.state_dict(), model_save_path)
+
+    return model
+
+def get_embs(id2cn, model, testData):
+    raw_dict = defaultdict(list)
+    output = inference_model(lambda model, batch : model.inference(batch[-1]), model, testData, batch_size=128)[0]
+    for i, d in enumerate(testData):
+        table_name, column_name = id2cn[d[0]]
+        pattern_id = d[1]
+        emb = output[i].detach().cpu().numpy()
+        raw_dict[(table_name, column_name)].append((table_name, column_name, pattern_id, emb))
+
+    result_dict = defaultdict(dict)
+    for (table_name, column_name), value in raw_dict.items():
+        result_dict[table_name][column_name] = value
+    return result_dict
+
+def get_pattern_emb(dataset, hidden_size, lr, batchsize, device):
+    save_path_root = 'embeddings/pattern'
+    if not os.path.exists(save_path_root):
+        os.makedirs(save_path_root)
+    save_path = os.path.join(save_path_root, f'{dataset}_pattern_emb.pickle')
+
+    if os.path.exists(save_path):
+        print('Complete get_pattern_emb !')
+        return
+
+    tableDict, cn2id, id2cn = get_base_info(dataset, f'base_info/{dataset}_base_info.pickle')
+    cn_id_list, pattern_id_list, pattern_vec = getData(dataset, [lambda x: x, argument], cn2id, device)
+    pattern_ori_vec = pattern_vec[0]
+    pattern_arg_vec = pattern_vec[1]
+    trainData = TensorDataset(pattern_ori_vec, pattern_arg_vec)
+    testData = TensorDataset(cn_id_list, pattern_id_list, pattern_ori_vec)
+    model = train_pattern_encoder(dataset, trainData, hidden_size, lr, batchsize, device)
+
+    res = get_embs(id2cn, model, testData)
+    pickle.dump(res, open(save_path, 'wb'))
+
+if __name__ == '__main__':
+    hidden_size = 256
+    lr = 0.0005
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    get_pattern_emb('test', hidden_size, lr, 128, device)
+    get_pattern_emb('test_split_2', hidden_size, lr, 128, device)
+
+    for n1 in ['TUS_', 'SANTOS_']:
+        for n2 in ['small', 'large']:
+            for n3 in ['', '_split_2']:
+                dataset = n1 + n2 + n3
+                get_pattern_emb(dataset, hidden_size, lr, 128, device)

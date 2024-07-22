@@ -30,13 +30,18 @@ def word_encoder_by_table(args):
         res[column_name] = [(x[0], x[1], word2vec_fasttext(fasttext_info, x[0])) for x in L]
     return res
 def word_encoder_all(dataset, fasttext_info, string_k = 64, number_k = 512):
-    csv_folder = get_csv_folder(dataset)
-    tokenized_path = f'step_result/tokens/{dataset}_tokens_{string_k}_string_{number_k}_number.pickle'
-    tokenized_info = pickle.load(open(tokenized_path, 'rb'))
     output_dict_file_root = 'embeddings/word'
     if not os.path.exists(output_dict_file_root):
         os.makedirs(output_dict_file_root)
     output_dict_file = os.path.join(output_dict_file_root, f'{dataset}_word_emb_{string_k}_sample.pickle')
+
+    if os.path.exists(output_dict_file):
+        print('Complete word_encoder_all !')
+        return
+
+    csv_folder = get_csv_folder(dataset)
+    tokenized_path = f'step_result/tokens/{dataset}_tokens_{string_k}_string_{number_k}_number.pickle'
+    tokenized_info = pickle.load(open(tokenized_path, 'rb'))
 
     res = {}
     for table_name in tqdm.tqdm(os.listdir(csv_folder)):

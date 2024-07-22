@@ -38,11 +38,10 @@ def run_step(dataset, trainData, testData, input_size, device, num_heads, hidden
     train(F, model, trainData, optimizer, batchsize, n_epochs)
     if model_save_path is not None:
         torch.save(model.state_dict(), model_save_path)
-    dict_k = {'TUS_small': 60, 'TUS_large': 60, 'SANTOS_small': 10, 'SANTOS_large': 20}
+    dict_k = {'TUS_small': 60, 'TUS_large': 60, 'SANTOS_small': 10, 'SANTOS_large': 20, 'test': 5}
     return calc(dataset, model, testData, dict_k[dataset], 'HNSW64')
 
 def run(dataset, left_list, right_list, input_size, num_heads_list, hiddensize_list, lr_list, batchsize):
-    message = '-'.join(leftList) + '==' + '-'.join(rightList)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     t1 = time.time()
     trainData = getTrainData(dataset + '_split_2', fill_template_list(left_list, dataset + '_split_2'), fill_template_list(right_list, dataset + '_split_2'))
@@ -58,7 +57,7 @@ def run(dataset, left_list, right_list, input_size, num_heads_list, hiddensize_l
                 print(dataset, num_heads, hiddensize, lr)
                 res = run_step(dataset, trainData, testData, input_size, device, num_heads, hiddensize, lr, batchsize, None)
                 print(res)
-                result.append((dataset, message, num_heads, hiddensize, lr, res))
+                result.append((dataset, num_heads, hiddensize, lr, res))
     return result
 
 def emb_path(L):
@@ -67,7 +66,7 @@ def emb_path(L):
         'paragraph' : ['embeddings/paragraph/{}_sample_128_paragraph__bert.pickle', 128, 768],
         'word' : ['embeddings/word/{}_word_emb_64_sample.pickle', 64, 300],
         'number': ['embeddings/number/{}_number_emb_128_dim.pickle', 14, 128],
-        'pattern': ['embeddings/pattern/{}_sample_128_pattern.pickle', 128, 128]
+        'pattern': ['embeddings/pattern/{}_pattern_emb.pickle', 128, 128]
     }
     return [emb_path_dict[x] for x in L]
 
@@ -83,10 +82,12 @@ def dims(L, num_heads = 8):
 
 if __name__ == '__main__':
     leftList = ['statistic']
-    # rightList = ['paragraph', 'word', 'number', 'pattern']
-    rightList = ['paragraph', 'word', 'number']
+    rightList = ['paragraph', 'word', 'number', 'pattern']
+    # rightList = ['paragraph', 'word', 'number']
+    # rightList = ['word', 'number']
 
     run('test', emb_path(leftList), emb_path(rightList), [dims(leftList), dims(rightList)], [2], [128],[0.0005], 64)
+    # run('SANTOS_small', emb_path(leftList), emb_path(rightList), [dims(leftList), dims(rightList)], [2], [128], [0.0005], 64)
 
     result = []
     for n1 in ['TUS_', 'SANTOS_']:

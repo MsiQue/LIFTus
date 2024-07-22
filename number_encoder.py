@@ -110,6 +110,9 @@ def number_encoder_all(dataset, dim, string_k = 64, number_k = 512):
     if not os.path.exists(save_path_root):
         os.makedirs(save_path_root)
     save_path = os.path.join(save_path_root, f'{dataset}_number_emb_{dim}_dim.pickle')
+    if os.path.exists(save_path):
+        print('Complete number_encoder_all !')
+        return
     tokenized_path = f'step_result/tokens/{dataset}_tokens_{string_k}_string_{number_k}_number.pickle'
     tokenized_info = pickle.load(open(tokenized_path, 'rb'))
     tableDict = {}
@@ -120,9 +123,10 @@ def number_encoder_all(dataset, dim, string_k = 64, number_k = 512):
     pickle.dump(tableDict, open(save_path, 'wb'))
 
 if __name__ == '__main__':
-    number_encoder_all('test', dim = 128)
-    number_encoder_all('test' + '_split_2', dim = 128)
+    # number_encoder_all('test', dim = 128)
+    # number_encoder_all('test' + '_split_2', dim = 128)
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
-            dataset = n1 + n2 + '_split_2'
-            number_encoder_all(dataset, dim = 128)
+            for n3 in ['', '_split_2']:
+                dataset = n1 + n2 + n3
+                number_encoder_all(dataset, dim = 128)

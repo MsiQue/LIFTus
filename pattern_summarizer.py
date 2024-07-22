@@ -79,15 +79,26 @@ def getPattern_all_parallel(data_path, save_path, n_sample, n_check, sequential_
         args_dict[table_name] = (os.path.join(data_path, table_name), n_sample, n_check)
     solve(message, sequential_cnt, parallel_cnt, getColPatterns_by_table, args_dict, os.listdir(data_path), save_path)
 
-def summarize_Pattern(dataset, n_sample, n_check):
+def summarize_Pattern(dataset, n_sample, n_check, is_parallel = False):
     path = get_csv_folder(dataset)
-    save_path = f'step_result/pattern/{dataset}_pattern_{n_sample}_{n_check}.pickle'
-    getPattern_all(path, save_path, n_sample, n_check)
-    # getPattern_all_parallel(path, save_path, n_sample, n_check, 50, 5)
+    save_path_root = 'step_result/pattern'
+    if not os.path.exists(save_path_root):
+        os.makedirs(save_path_root)
+    save_path = os.path.join(save_path_root, f'{dataset}_pattern_{n_sample}_{n_check}.pickle')
+
+    if os.path.exists(save_path):
+        print('Complete summarize_Pattern !')
+        return
+
+    if is_parallel:
+        getPattern_all_parallel(path, save_path, n_sample, n_check, 50, 5)
+    else:
+        getPattern_all(path, save_path, n_sample, n_check)
 
 if __name__ == '__main__':
+    summarize_Pattern('test' + '_split_2', 10, 10)
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
-            summarize_Pattern(n1 + n2, 10, 10)
+            summarize_Pattern(n1 + n2 + '_split_2', 10, 10)
     # summarize_Pattern('SANTOS_small', 10, 10)
     # summarize_Pattern('SANTOS_large', 10, 10)

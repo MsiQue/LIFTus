@@ -31,7 +31,16 @@ def tokenize_column_by_table(args):
         number_topK[column_name] = set(number_counts[:number_k])
     return (string_topK, number_topK)
 
-def tokenizer_all(data_path, save_path, string_k, number_k):
+def tokenizer_all(dataset, string_k, number_k):
+    data_path = get_csv_folder(dataset)
+    save_path_root = 'step_result/tokens'
+    if not os.path.exists(save_path_root):
+        os.makedirs(save_path_root)
+    save_path = os.path.join(save_path_root, f'{dataset}_tokens_{string_k}_string_{number_k}_number.pickle')
+    if os.path.exists(save_path):
+        print('Complete tokenizer_all !')
+        return
+
     tableDict = {}
     for fn in tqdm.tqdm(os.listdir(data_path)):
         data_file = os.path.join(data_path, fn)
@@ -39,7 +48,13 @@ def tokenizer_all(data_path, save_path, string_k, number_k):
         tableDict[fn] = tokenize_column_by_table(args)
     pickle.dump(tableDict, open(save_path, 'wb'))
 
-def tokenizer_all_parallel(data_path, save_path, string_k, number_k, sequential_cnt, parallel_cnt):
+def tokenizer_all_parallel(dataset, string_k, number_k, sequential_cnt, parallel_cnt):
+    data_path = get_csv_folder(dataset)
+    save_path_root = 'step_result/tokens'
+    if not os.path.exists(save_path_root):
+        os.makedirs(save_path_root)
+    save_path = os.path.join(save_path_root, f'{dataset}_tokens_{string_k}_string_{number_k}_number.pickle')
+
     message = f'get {save_path}'
     args_dict = {}
     for table_name in tqdm.tqdm(os.listdir(data_path)):
@@ -49,16 +64,14 @@ def tokenizer_all_parallel(data_path, save_path, string_k, number_k, sequential_
 if __name__ == '__main__':
     string_k = 64
     number_k = 512
-    # for n1 in ['TUS_', 'SANTOS_']:
-    #     for n2 in ['small', 'large']:
-    #         dataset = n1 + n2
-    #         data_path = get_csv_folder(dataset)
-    #         save_path = f'step_result/tokens/{dataset}_tokens_{string_k}_string_{number_k}_number.pickle'
-    #         tokenizer_all(data_path, save_path, string_k, number_k)
-    #         tokenizer_all_parallel(data_path, save_path, string_k, number_k, 50, 5)
 
-    dataset = 'test'
-    data_path = get_csv_folder(dataset)
-    save_path = f'step_result/tokens/{dataset}_tokens_{string_k}_string_{number_k}_number.pickle'
-    tokenizer_all(data_path, save_path, string_k, number_k)
-    # tokenizer_all_parallel(data_path, save_path, string_k, number_k, 50, 5)
+    # tokenizer_all('test' + '_split_2', string_k, number_k)
+    # tokenizer_all_parallel('test' + '_split_2', string_k, number_k, 50, 5)
+
+    for n1 in ['TUS_', 'SANTOS_']:
+        for n2 in ['small', 'large']:
+            dataset = n1 + n2 + '_split_2'
+            # tokenizer_all(dataset, string_k, number_k)
+            tokenizer_all_parallel(dataset, string_k, number_k, 50, 25)
+
+

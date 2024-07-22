@@ -54,6 +54,10 @@ def paragraph_encoder_all(dataset, sample_cnt, method, is_parallel = False, **kw
         os.makedirs(output_dict_file_root)
     output_dict_file = os.path.join(output_dict_file_root, f'{dataset}_sample_{sample_cnt}_paragraph__{method}.pickle')
 
+    if os.path.exists(output_dict_file):
+        print('Complete paragraph_encoder_all !')
+        return
+
     todo_list = os.listdir(csv_folder)
     args_dict = {}
     for table_name in todo_list:
@@ -81,8 +85,15 @@ if __name__ == '__main__':
 
     print('finishing loading LM')
 
-    paragraph_encoder_all('test', 128, 'bert', is_parallel=False, convertFunc = convertFunc_bert, tokenizer = tokenizer, model = model, device = device)
-    paragraph_encoder_all('test_split_2', 128, 'bert', is_parallel=False, convertFunc = convertFunc_bert, tokenizer = tokenizer, model = model, device = device)
+    # paragraph_encoder_all('test', 128, 'bert', is_parallel=False, convertFunc = convertFunc_bert, tokenizer = tokenizer, model = model, device = device)
+    # paragraph_encoder_all('test_split_2', 128, 'bert', is_parallel=False, convertFunc = convertFunc_bert, tokenizer = tokenizer, model = model, device = device)
+
+    paragraph_encoder_all('SANTOS_small', 128, 'bert', is_parallel=False, convertFunc=convertFunc_bert, tokenizer=tokenizer,
+                          model=model, device=device)
+    paragraph_encoder_all('SANTOS_small_split_2', 128, 'bert', is_parallel=False, convertFunc=convertFunc_bert,
+                          tokenizer=tokenizer,
+                          model=model, device=device)
+
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
             for n3 in ['', '_split_2']:

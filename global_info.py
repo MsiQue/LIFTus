@@ -42,6 +42,7 @@ def get_base_info(dataset, save_path):
                 print(f'exist \\r in {dataset} {tn} {cn}')
 
     pickle.dump((tableDict, cn2id, id2cn), open(save_path, 'wb'))
+    return tableDict, cn2id, id2cn
 
 def get_base_info_all(base_path):
     if not os.path.exists(base_path):

@@ -72,9 +72,12 @@ def column_statistic_by_table(args):
 def column_statistic_all(dataset, sample_cnt):
     data_path = get_csv_folder(dataset)
     save_path_root = 'embeddings/statistic'
-    save_path = os.path.join(save_path_root, f'{dataset}_statistic.pickle')
     if not os.path.exists(save_path_root):
         os.makedirs(save_path_root)
+    save_path = os.path.join(save_path_root, f'{dataset}_statistic.pickle')
+    if os.path.exists(save_path):
+        print('Complete column_statistic_all!')
+        return
     tableDict = {}
     en_words = set(words.words())
     for fn in tqdm.tqdm(os.listdir(data_path)):
@@ -85,10 +88,11 @@ def column_statistic_all(dataset, sample_cnt):
 
 if __name__ == '__main__':
     sample_cnt = 200
+
+    dataset = 'test' + '_split_2'
+    column_statistic_all(dataset, sample_cnt)
+
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
-            dataset = n1 + n2
+            dataset = n1 + n2 + '_split_2'
             column_statistic_all(dataset, sample_cnt)
-
-    # dataset = 'test'
-    # column_statistic_all(dataset, sample_cnt)
