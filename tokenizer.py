@@ -1,4 +1,5 @@
 import tqdm
+import time
 import os
 import pickle
 import pandas as pd
@@ -55,11 +56,18 @@ def tokenizer_all_parallel(dataset, string_k, number_k, sequential_cnt, parallel
         os.makedirs(save_path_root)
     save_path = os.path.join(save_path_root, f'{dataset}_tokens_{string_k}_string_{number_k}_number.pickle')
 
+    if os.path.exists(save_path):
+        print(f'Already complete tokenizer_all_parallel on {save_path} before!')
+        return
+
+    start_time = time.time()
+    print(f'Start tokenizer_all_parallel on {dataset}.')
     message = f'get {save_path}'
     args_dict = {}
-    for table_name in tqdm.tqdm(os.listdir(data_path)):
+    for table_name in os.listdir(data_path):
         args_dict[table_name] = (os.path.join(data_path, table_name), string_k, number_k)
     solve(message, sequential_cnt, parallel_cnt, tokenize_column_by_table, args_dict, os.listdir(data_path), save_path)
+    print(f'Complete tokenizer_all_parallel on {dataset} using {time.time() - start_time} s.')
 
 if __name__ == '__main__':
     string_k = 64
@@ -70,8 +78,9 @@ if __name__ == '__main__':
 
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
-            dataset = n1 + n2 + '_split_2'
+            # dataset = n1 + n2 + '_split_2'
+            dataset = n1 + n2
             # tokenizer_all(dataset, string_k, number_k)
-            tokenizer_all_parallel(dataset, string_k, number_k, 50, 25)
+            tokenizer_all_parallel(dataset, string_k, number_k, 10, 30)
 
 

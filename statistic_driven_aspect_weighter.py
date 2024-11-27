@@ -1,4 +1,5 @@
 import os
+import time
 import tqdm
 import pickle
 import inspect
@@ -8,6 +9,7 @@ import pandas as pd
 from global_info import get_csv_folder
 from tokenizer import getWordsCount
 from nltk.corpus import words
+from parallel import solve
 
 def delEmpty(values_raw):
     non_empty_series = values_raw.dropna()
@@ -86,13 +88,37 @@ def column_statistic_all(dataset, sample_cnt):
         tableDict[fn] = column_statistic_by_table(args)
     pickle.dump(tableDict, open(save_path, 'wb'))
 
+def column_statistic_parallel(dataset, sample_cnt, sequential_cnt, parallel_cnt):
+    data_path = get_csv_folder(dataset)
+    save_path_root = 'embeddings/statistic'
+    if not os.path.exists(save_path_root):
+        os.makedirs(save_path_root)
+    save_path = os.path.join(save_path_root, f'{dataset}_statistic.pickle')
+
+    if os.path.exists(save_path):
+        print(f'Already complete column_statistic_parallel on {save_path} before!')
+        return
+
+    start_time = time.time()
+    print(f'Start column_statistic_parallel on {dataset}.')
+    message = f'get {save_path}'
+    en_words = set(words.words())
+    args_dict = {}
+    for table_name in os.listdir(data_path):
+        args_dict[table_name] = (os.path.join(data_path, table_name), sample_cnt, en_words)
+    solve(message, sequential_cnt, parallel_cnt, column_statistic_by_table, args_dict, os.listdir(data_path), save_path)
+    print(f'Complete column_statistic_parallel on {dataset} using {time.time() - start_time} s.')
+
 if __name__ == '__main__':
     sample_cnt = 200
 
-    dataset = 'test' + '_split_2'
-    column_statistic_all(dataset, sample_cnt)
+    # dataset = 'test' + '_split_2'
+    # column_statistic_all(dataset, sample_cnt)
 
     for n1 in ['TUS_', 'SANTOS_']:
         for n2 in ['small', 'large']:
-            dataset = n1 + n2 + '_split_2'
-            column_statistic_all(dataset, sample_cnt)
+            for n3 in ['']:
+            # for n3 in ['', '_split_2']:
+                dataset = n1 + n2 + n3
+                # column_statistic_all(dataset, sample_cnt)
+                column_statistic_parallel(dataset, sample_cnt, sequential_cnt=10, parallel_cnt=30)

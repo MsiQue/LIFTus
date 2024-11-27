@@ -58,9 +58,9 @@ def statistics_by_letter(col):
     string_series = col.astype(str)
     total_length = string_series.str.len().sum()
     regex_template = [r'[A-Z]', r'[a-z]', r'[0-9]']
-    regex_result = [string_series.str.count(t).sum() / total_length for t in regex_template]
+    regex_result = [string_series.str.count(t).sum() / total_length if total_length else 0 for t in regex_template]
     letter_template = [chr(x) for x in [10, 13] + list(range(32, 48)) + list(range(58, 65)) + list(range(91, 97)) + list(range(123, 127))]
-    letter_result = [string_series.str.count(re.escape(t)).sum() / total_length for t in letter_template]
+    letter_result = [string_series.str.count(re.escape(t)).sum() / total_length if total_length else 0 for t in letter_template]
     return regex_result + letter_result
 
 # def NLW_Coverage(col):

@@ -54,9 +54,12 @@ def calc(dataset, model, testData, k, method):
     column_info, column_dict = get_embs(dataset, model, testData)
     feat_index = index_init(column_info, method)
 
+    ave_map = 0
     ave_precision = 0
     ave_recall = 0
     cnt = 0
+    precision_list = [0 for i in range(k)]
+    recall_list = [0 for i in range(k)]
     for query_table, _ in gt.items():
         if query_table.startswith('t_28'):
             # fair compare with Starmie
@@ -69,6 +72,15 @@ def calc(dataset, model, testData, k, method):
         grt = set(_)
         res = set([element[0] for element in M.most_common(k)])
 
+        map = 0
+        right_cnt = 0
+        for i, element in enumerate(M.most_common(k)):
+            if element[0] in grt:
+                right_cnt += 1
+            map += right_cnt / (i + 1)
+            precision_list[i] += right_cnt / (i + 1)
+            recall_list[i] += right_cnt / len(_)
+
         right = len(grt & res)
         if len(res) == 0:
             print(query_table)
@@ -77,13 +89,17 @@ def calc(dataset, model, testData, k, method):
         if len(res) != k:
             print(f'Table {query_table} not match enough')
 
+        ave_map += map / len(res)
         ave_precision += right / len(res)
         ave_recall += right / len(_)
         cnt += 1
         M[right] += 1
-        # if right < k:
-        #     print(query_table, right)
+        if right < k:
+            print(query_table, right)
+    ave_map /= cnt
     ave_precision /= cnt
     ave_recall /= cnt
     # print(ave_precision, ave_recall)
-    return ave_precision, ave_recall
+    print('Precision @ k:', [_ / cnt for _ in precision_list])
+    print('Recall @ k:', [_ / cnt for _ in recall_list])
+    return ave_map, ave_precision, ave_recall

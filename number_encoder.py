@@ -1,6 +1,7 @@
 from global_info import get_csv_folder
 from utils import is_invalid
 import os
+import time
 import math
 import tqdm
 import pickle
@@ -50,10 +51,15 @@ def sgn(x):
     else:
         return 0
 
-def f_base(a, x):
+# def f_base(a, x):
+#     if is_invalid(x):
+#         return -1
+#     return sgn(x) * (abs(x) ** a)
+
+def f_base(a, x, alpha = 0.2):
     if is_invalid(x):
         return -1
-    return sgn(x) * (abs(x) ** a)
+    return sgn(x) * (abs(x) ** (a * alpha))
 
 def f_macro(a, x):
     if is_invalid(x):
@@ -111,16 +117,20 @@ def number_encoder_all(dataset, dim, string_k = 64, number_k = 512):
         os.makedirs(save_path_root)
     save_path = os.path.join(save_path_root, f'{dataset}_number_emb_{dim}_dim.pickle')
     if os.path.exists(save_path):
-        print('Complete number_encoder_all !')
+        print(f'Already complete number_encoder_all on {save_path} before!')
         return
+
+    start_time = time.time()
+    print(f'Start number_encoder_all on {dataset}.')
     tokenized_path = f'step_result/tokens/{dataset}_tokens_{string_k}_string_{number_k}_number.pickle'
     tokenized_info = pickle.load(open(tokenized_path, 'rb'))
     tableDict = {}
-    for fn in tqdm.tqdm(os.listdir(data_path)):
+    for fn in os.listdir(data_path):
         data_file = os.path.join(data_path, fn)
         args = (data_file, tokenized_info[fn][1], dim)
         tableDict[fn] = number_encoder_by_table(args)
     pickle.dump(tableDict, open(save_path, 'wb'))
+    print(f'Complete number_encoder_all on {dataset} using {time.time() - start_time} s.')
 
 if __name__ == '__main__':
     # number_encoder_all('test', dim = 128)

@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import pickle
 import tqdm
+import time
 import os
 import io
 def load_vectors(fname):
@@ -36,19 +37,23 @@ def word_encoder_all(dataset, fasttext_info, string_k = 64, number_k = 512):
     output_dict_file = os.path.join(output_dict_file_root, f'{dataset}_word_emb_{string_k}_sample.pickle')
 
     if os.path.exists(output_dict_file):
-        print('Complete word_encoder_all !')
+        print(f'Already complete word_encoder_all on {output_dict_file} before!')
         return
+
+    start_time = time.time()
+    print(f'Start word_encoder_all on {dataset}.')
 
     csv_folder = get_csv_folder(dataset)
     tokenized_path = f'step_result/tokens/{dataset}_tokens_{string_k}_string_{number_k}_number.pickle'
     tokenized_info = pickle.load(open(tokenized_path, 'rb'))
 
     res = {}
-    for table_name in tqdm.tqdm(os.listdir(csv_folder)):
+    for table_name in os.listdir(csv_folder):
         table_path = os.path.join(csv_folder, table_name)
         args = (table_path, tokenized_info[table_name][0], fasttext_info, string_k)
         res[table_name] = word_encoder_by_table(args)
     pickle.dump(res, open(output_dict_file, 'wb'))
+    print(f'Complete word_encoder_all on {dataset} using {time.time() - start_time} s.')
 
 if __name__ == '__main__':
     fasttext_path = 'LM/fasttext/wiki-news-300d-1M.vec'

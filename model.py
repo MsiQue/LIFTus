@@ -2,6 +2,21 @@ import torch
 import torch.nn as nn
 from loss import info_nce_loss
 
+class SubLayer(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(SubLayer, self).__init__()
+        self.batch_norm = nn.BatchNorm1d(input_size)
+        self.linear = nn.Linear(input_size, hidden_size)
+
+    def forward(self, x):
+        # (batch_size, seq_length, input_size)
+        x = x.permute(0, 2, 1)
+        x = self.batch_norm(x)
+        x = x.permute(0, 2, 1)
+        x = self.linear(x)
+
+        return x
+
 class SelfAttention(nn.Module):
     def __init__(self, input_size, hidden_size, num_heads):
         super(SelfAttention, self).__init__()
@@ -20,7 +35,7 @@ class Net(nn.Module):
         super(Net, self).__init__()
         self.input_size_left = input_size_left
         self.input_size_right = input_size_right
-        self.layers_left = nn.ModuleList([nn.Linear(input_size, hidden_size) for input_size in input_size_left])
+        self.layers_left = nn.ModuleList([SubLayer(input_size, hidden_size) for input_size in input_size_left])
         self.layers_right = nn.ModuleList([SelfAttention(input_size[0], hidden_size, input_size[1]) if isinstance(input_size, list) else nn.Linear(input_size, hidden_size) for input_size in input_size_right])
         self.multihead_attention = nn.MultiheadAttention(hidden_size, num_heads)
         self.criterion = criterion

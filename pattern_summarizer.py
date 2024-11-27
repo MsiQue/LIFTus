@@ -4,6 +4,7 @@ from global_info import get_csv_folder
 from parallel import solve
 from collections import defaultdict
 import tqdm
+import time
 import os
 import pandas as pd
 def merge(s1, s2):
@@ -66,7 +67,7 @@ def getColPatterns_by_table(args):
 
 def getPattern_all(data_path, save_path, n_sample, n_check):
     tableDict = {}
-    for fn in tqdm.tqdm(os.listdir(data_path)):
+    for fn in os.listdir(data_path):
         data_file = os.path.join(data_path, fn)
         args = (data_file, n_sample, n_check)
         tableDict[fn] = getColPatterns_by_table(args)
@@ -75,11 +76,11 @@ def getPattern_all(data_path, save_path, n_sample, n_check):
 def getPattern_all_parallel(data_path, save_path, n_sample, n_check, sequential_cnt, parallel_cnt):
     message = f'get {save_path}'
     args_dict = {}
-    for table_name in tqdm.tqdm(os.listdir(data_path)):
+    for table_name in os.listdir(data_path):
         args_dict[table_name] = (os.path.join(data_path, table_name), n_sample, n_check)
     solve(message, sequential_cnt, parallel_cnt, getColPatterns_by_table, args_dict, os.listdir(data_path), save_path)
 
-def summarize_Pattern(dataset, n_sample, n_check, is_parallel = False):
+def summarize_Pattern(dataset, n_sample, n_check, is_parallel = False, sequential_cnt=10, parallel_cnt=30):
     path = get_csv_folder(dataset)
     save_path_root = 'step_result/pattern'
     if not os.path.exists(save_path_root):
@@ -87,13 +88,16 @@ def summarize_Pattern(dataset, n_sample, n_check, is_parallel = False):
     save_path = os.path.join(save_path_root, f'{dataset}_pattern_{n_sample}_{n_check}.pickle')
 
     if os.path.exists(save_path):
-        print('Complete summarize_Pattern !')
+        print(f'Already complete summarize_Pattern on {save_path} before!')
         return
 
+    start_time = time.time()
+    print(f'Start summarize_Pattern on {dataset}.')
     if is_parallel:
-        getPattern_all_parallel(path, save_path, n_sample, n_check, 50, 5)
+        getPattern_all_parallel(path, save_path, n_sample, n_check, sequential_cnt, parallel_cnt)
     else:
         getPattern_all(path, save_path, n_sample, n_check)
+    print(f'Complete summarize_Pattern on {dataset} using {time.time() - start_time} s.')
 
 if __name__ == '__main__':
     summarize_Pattern('test' + '_split_2', 10, 10)

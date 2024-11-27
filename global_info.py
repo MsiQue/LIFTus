@@ -20,7 +20,9 @@ def get_ground_truth(dataset):
     elif 'SANTOS_small' in dataset:
         gt_path = 'ground_truth/santosUnionBenchmark.pickle'
     elif 'SANTOS_large' in dataset:
-        gt_path = 'ground_truth/real_tablesUnionBenchmark_3.pickle'
+        gt_path = 'ground_truth/real_tablesUnionBenchmark.pickle'
+    elif 'OpenDataLarge' in dataset:
+        gt_path = 'ground_truth/OpenDataLargeBenchmark.pickle'
     return pickle5.load(open(gt_path, 'rb'))
 
 def get_base_info(dataset, save_path):
@@ -40,6 +42,9 @@ def get_base_info(dataset, save_path):
             id2cn.append((tn, cn))
             if '\r' in cn:
                 print(f'exist \\r in {dataset} {tn} {cn}')
+
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path))
 
     pickle.dump((tableDict, cn2id, id2cn), open(save_path, 'wb'))
     return tableDict, cn2id, id2cn

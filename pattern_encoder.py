@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 import torch.nn as nn
 import pickle
@@ -7,8 +8,45 @@ from collections import defaultdict
 from global_info import get_base_info
 from loss import info_nce_loss
 from transformers import AdamW
-from trainprocess import train, inference_model
-from torch.utils.data import TensorDataset
+from torch.utils.data import TensorDataset, DataLoader
+from transformers import get_linear_schedule_with_warmup
+
+def train(F, model, Data, optimizer, batch_size, n_epochs, device):
+    dataloader = DataLoader(Data, batch_size, shuffle=True)
+    num_steps = (len(Data) // batch_size) * n_epochs
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_steps)
+    for epoch in range(1, n_epochs+1):
+        model.train()
+        for i, batch in enumerate(dataloader):
+            optimizer.zero_grad()
+            loss = F(model, batch, device)
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            if i % 10 == 0:
+                print(f"step: {i}, loss: {loss.item()}")
+            del loss
+
+def inference_model(F, model, Data, batch_size, device):
+    test_loader = DataLoader(Data, batch_size=batch_size, shuffle=False)
+    model.eval()
+    res = []
+
+    with torch.no_grad():
+        for batch in test_loader:
+            outputs = F(model, batch, device)
+            if isinstance(outputs, tuple):
+                res.append([o.detach().cpu() for o in outputs])
+            else:
+                res.append([outputs.detach().cpu()])
+
+            del batch
+            del outputs
+            torch.cuda.empty_cache()
+
+
+    L = len(res[0])
+    return [torch.cat([t[i] for t in res], dim = 0) for i in range(L)]
 
 def strReplace(s, idxList, newChar):
     for idx in idxList:
@@ -30,7 +68,8 @@ def argument(s):
         result.append(strReplace(s, random_idx, '*'))
 
     # 将其中一个数字替换为另一个数字
-    digits_idx = [idx for idx, char in enumerate(s) if char.isdigit()]
+    # digits_idx = [idx for idx, char in enumerate(s) if char.isdigit()]  #  '³'
+    digits_idx = [idx for idx, char in enumerate(s) if (ord('0') <= ord(char) and ord(char) <= ord('9'))]
     if digits_idx:
         random_idx = random.choice(digits_idx)
         _new = (int(s[random_idx]) + random.randint(1, 9)) % 10
@@ -119,9 +158,9 @@ def getData(dataset, func_list, cn2id, device, n_sample = 10, n_check = 10):
                     pattern_vec_list[i].append(string_to_onehot_matrix(func(pattern))[0])
     return torch.tensor(cn_id_list).to(device), torch.tensor(pattern_id_list).to(device), [torch.stack(x, dim=0).to(device) for x in pattern_vec_list]
 
-def F(model, batch):
+def F(model, batch, device):
     batch_ori, batch_arg = batch
-    return model(batch_ori, batch_arg)
+    return model(batch_ori.to(device), batch_arg.to(device))
 
 def train_pattern_encoder(dataset, trainData, hidden_size, lr, batchsize, device, n_epochs = 10):
     model_save_path_root = 'step_result/pattern_model'
@@ -137,24 +176,26 @@ def train_pattern_encoder(dataset, trainData, hidden_size, lr, batchsize, device
         return model
 
     optimizer = AdamW(model.parameters(), lr=lr)
-    train(F, model, trainData, optimizer, batchsize, n_epochs)
+    train(F, model, trainData, optimizer, batchsize, n_epochs, device)
 
     torch.save(model.state_dict(), model_save_path)
 
     return model
 
-def get_embs(id2cn, model, testData):
+def get_embs(id2cn, model, testData, device):
     raw_dict = defaultdict(list)
-    output = inference_model(lambda model, batch : model.inference(batch[-1]), model, testData, batch_size=128)[0]
+    output = inference_model(lambda model, batch, device : model.inference(batch[-1].to(device)), model, testData, batch_size=128, device=device)[0]
+
     for i, d in enumerate(testData):
         table_name, column_name = id2cn[d[0]]
-        pattern_id = d[1]
+        pattern_id = d[1].detach().cpu().numpy()
         emb = output[i].detach().cpu().numpy()
         raw_dict[(table_name, column_name)].append((table_name, column_name, pattern_id, emb))
 
     result_dict = defaultdict(dict)
     for (table_name, column_name), value in raw_dict.items():
         result_dict[table_name][column_name] = value
+
     return result_dict
 
 def get_pattern_emb(dataset, hidden_size, lr, batchsize, device):
@@ -163,20 +204,61 @@ def get_pattern_emb(dataset, hidden_size, lr, batchsize, device):
         os.makedirs(save_path_root)
     save_path = os.path.join(save_path_root, f'{dataset}_pattern_emb.pickle')
 
-    if os.path.exists(save_path):
-        print('Complete get_pattern_emb !')
+    model_save_path_root = 'step_result/pattern_model'
+    if not os.path.exists(model_save_path_root):
+        os.makedirs(model_save_path_root)
+    model_save_path = os.path.join(model_save_path_root, f'{dataset}_pattern_encoder.pth')
+
+    if os.path.exists(save_path) and os.path.exists(model_save_path):
+        print(f'Already complete get_pattern_emb on {save_path} before!')
         return
 
+    start_time = time.time()
+    print(f'Start get_pattern_emb on {dataset}.')
+
     tableDict, cn2id, id2cn = get_base_info(dataset, f'base_info/{dataset}_base_info.pickle')
-    cn_id_list, pattern_id_list, pattern_vec = getData(dataset, [lambda x: x, argument], cn2id, device)
+    cn_id_list, pattern_id_list, pattern_vec = getData(dataset, [lambda x: x, argument], cn2id, torch.device('cpu'))
     pattern_ori_vec = pattern_vec[0]
     pattern_arg_vec = pattern_vec[1]
     trainData = TensorDataset(pattern_ori_vec, pattern_arg_vec)
     testData = TensorDataset(cn_id_list, pattern_id_list, pattern_ori_vec)
     model = train_pattern_encoder(dataset, trainData, hidden_size, lr, batchsize, device)
 
-    res = get_embs(id2cn, model, testData)
+    torch.save(model.state_dict(), model_save_path)
+
+    res = get_embs(id2cn, model, testData, device)
     pickle.dump(res, open(save_path, 'wb'))
+
+    print(f'Complete get_pattern_emb on {dataset} using {time.time() - start_time} s.')
+
+def get_pattern_emb_eval(train_dataset, test_dataset, hidden_size, device):
+    save_path_root = 'embeddings/pattern'
+    if not os.path.exists(save_path_root):
+        os.makedirs(save_path_root)
+    save_path = os.path.join(save_path_root, f'{test_dataset}_pattern_emb.pickle')
+
+    if os.path.exists(save_path):
+        print(f'Already complete get_pattern_emb_eval on {save_path} before!')
+        return
+
+    start_time = time.time()
+    print(f'Start get_pattern_emb_eval on (train_dataset {train_dataset}) (test_dataset {test_dataset}) .')
+
+    tableDict, cn2id, id2cn = get_base_info(test_dataset, f'base_info/{test_dataset}_base_info.pickle')
+
+    cn_id_list, pattern_id_list, pattern_vec = getData(test_dataset, [lambda x: x], cn2id, torch.device('cpu'))
+    pattern_ori_vec = pattern_vec[0]
+    testData = TensorDataset(cn_id_list, pattern_id_list, pattern_ori_vec)
+
+    model = SiameseNetwork(input_size=98, hidden_size=hidden_size, criterion=nn.CrossEntropyLoss().to(device))
+    model = model.to(device)
+    model_save_path = os.path.join('step_result/pattern_model', f'{train_dataset}_pattern_encoder.pth')
+    model.load_state_dict(torch.load(model_save_path))
+
+    res = get_embs(id2cn, model, testData, device)
+    pickle.dump(res, open(save_path, 'wb'))
+
+    print(f'Complete get_pattern_emb_eval on (train_dataset {train_dataset}) (test_dataset {test_dataset}) using {time.time() - start_time} s.')
 
 if __name__ == '__main__':
     hidden_size = 256
