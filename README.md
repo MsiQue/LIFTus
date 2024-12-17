@@ -49,6 +49,38 @@ cd LIFTus
 python run_all.py
 ```
 
+## Setup
+
+* If you want to run LIFTus in your private data lake, please refer to the following steps:
+* Step 1: Similar to the previous operation in *Reproducibility*, build the file tree in the following form:
+```
+📂 LIFTus
+├── 📂 LM
+│    ├── 📂 fasttext
+│    │    └── wiki-news-300d-1M.vec
+│    └── 📂 bert
+├── 📂 data_lake
+│    ├── [data_lake_name]
+│    ├── ...
+├── 📂 ground_truth
+├── 📂 ... (Other directories can be automatically generated)
+```
+* Step 2: Create a new folder in the ./data_lake directory, with the folder name being the name of the data lake (denoted as [data_lake_name], which needs to replace the dataset name in the code), and then copy the CSV format table to this folder.
+* Step 3: Groundtruth File. It is stored using a pickle file, and the stored object is a dictionary. The keys of the dictionary are the names of the query table, and the values are lists that contain the names of all the tables which can be united with the query table.
+* Step 4: To modify the get_ground_truth() function in the *global.py* file, you need to add [data_lake_name] to the actual storage location of the pickle file for ground truth. 
+* Step 5: Modify the main function in *run_all.py* to the following:
+```python
+if __name__ == '__main__':  
+    leftList = ['statistic']  
+    rightList = ['paragraph', 'word', 'number', 'pattern']  
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  
+    run_all('[data_lake_name]', '[data_lake_name]', leftList, rightList, device) 
+```
+* Step 6:  Run script
+```
+python run_all.py
+```
+
 ## Requirements
 * python 3.7.10
 * pytorch 1.8.1
